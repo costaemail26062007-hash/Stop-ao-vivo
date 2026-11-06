@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stop ao Vivo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* Layout: coluna centralizada de celular (9:16), seguindo os 3 desenhos do usuário.
+   Rodada: TEMA + letra no círculo + frase, tabela de acertos (2 colunas) e mini-pódio embaixo.
+   Intervalo: os 3 mais rápidos da rodada. Final: CAMPEÕES, pódio, 4º e 5º lugar.
+   Fundo roxo com gradiente que clareia para branco; cores vibrantes só nos destaques. */
+:root {
+  --roxo: #4b14c4;
+  --roxo-escuro: #2a0a6e;
+  --ouro: #ffd60a;
+  --aqua: #19e3d1;
+  --rosa: #ff3d9a;
+  --laranja: #ff8a1f;
+  --lilas: #c9b6ff;
+  --font-display: "Bowlby One", "Arial Black", Impact, sans-serif;
+  --font-body: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { min-height: 100%; }
+body {
+  margin: 0; min-height: 100vh; color: #fff;
+  font-family: var(--font-body); font-size: 15px; line-height: 1.4; text-align: center;
+  background-color: var(--roxo);
+  background-image:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.34) 0, rgba(255,255,255,0) 44%),
+    linear-gradient(180deg, #4b14c4 0%, #6a2ee0 42%, #b99bff 78%, #f4eeff 100%);
+  background-repeat: no-repeat;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 28px;
+}
+.wrap { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+
+/* ----- topo ----- */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 36px; }
+.status { font-size: 12px; display: flex; align-items: center; gap: 6px; min-width: 0; color: #fff; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--lilas); flex: none; }
+.status.on i { background: var(--aqua); }
+.status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clockchip {
+  display: none; font-family: var(--font-display); font-size: 20px; min-width: 62px;
+  background: #fff; color: var(--roxo-escuro); border-radius: 99px; padding: 3px 14px;
+  font-variant-numeric: tabular-nums;
+}
+.clockchip.low { background: var(--rosa); color: #fff; }
+.roundtag {
+  font-family: var(--font-display); font-size: 15px; background: var(--ouro); color: var(--roxo-escuro);
+  padding: 6px 14px; border-radius: 99px; white-space: nowrap; margin-left: auto;
+}
+[data-fase="rodada"] .clockchip { display: block; }
+[data-fase="rodada"] .status { display: none; }
+
+.toast {
+  align-self: center; background: var(--aqua); color: var(--roxo-escuro); font-weight: 700; font-size: 13px;
+  padding: 5px 14px; border-radius: 99px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  animation: slide .25s ease-out; position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 5;
+}
+
+/* ----- palco ----- */
+.stage, .interval, .final {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: 8px; min-height: 336px; padding-top: 2px;
+}
+.interval, .final { display: none; justify-content: flex-start; }
+[data-fase="intervalo"] .interval { display: flex; }
+[data-fase="intervalo"] .stage { display: none; }
+[data-fase="final"] .final { display: flex; }
+[data-fase="final"] .stage, [data-fase="final"] .bottom { display: none; }
+
+.tlabel {
+  font-family: var(--font-display); font-size: 32px; letter-spacing: .08em; text-transform: uppercase;
+  color: #fff; text-shadow: 3px 3px 0 var(--rosa); line-height: 1.1; text-wrap: balance;
+}
+.tlabel.small { font-size: 22px; text-shadow: 2px 2px 0 var(--rosa); margin-bottom: 14px; }
+.tname {
+  font-family: var(--font-display); font-size: 42px; line-height: 1.05; text-transform: uppercase;
+  background: var(--ouro); color: var(--roxo-escuro); padding: 4px 18px 7px; border-radius: 12px;
+  box-shadow: 5px 5px 0 var(--roxo-escuro); text-wrap: balance; overflow-wrap: anywhere; max-width: 100%;
+}
+[data-fase="prepare"] .tlabel { font-size: 18px; letter-spacing: .05em; text-shadow: none; }
+[data-fase="prepare"] .tname { letter-spacing: .3em; animation: pulse 1s infinite; }
+[data-fase="tema"] .tname { animation: pop .4s cubic-bezier(.2,1.6,.4,1); }
+[data-fase="espera"] .tlabel { font-size: 34px; }
+
+.orb { position: relative; width: 204px; height: 204px; margin: 4px 0; transition: opacity .3s; }
+[data-fase="espera"] .orb, [data-fase="prepare"] .orb, [data-fase="tema"] .orb { opacity: .28; }
+.ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ring .trk { fill: none; stroke: rgba(255,255,255,.35); stroke-width: 8; }
+.ring .prog { fill: none; stroke: var(--ouro); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 641; stroke-dashoffset: 0; }
+.ring.low .prog { stroke: var(--rosa); }
+[data-fase="roleta"] .ring .prog { stroke: var(--rosa); }
+.disc {
+  position: absolute; inset: 22px; border-radius: 50%; background: #fff; color: var(--roxo);
+  display: grid; place-items: center; font-family: var(--font-display); font-size: 112px; line-height: 1;
+  box-shadow: 0 0 0 5px var(--ouro), 0 10px 28px rgba(42,10,110,.45);
+}
+.disc.tic { animation: tic .12s ease-out; }
+.disc.lock { animation: lock .45s cubic-bezier(.2,1.7,.4,1); }
+.frase {
+  font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: .06em; min-height: 22px;
+  text-shadow: 0 2px 0 rgba(42,10,110,.5); text-wrap: balance;
+}
+.frase b { color: var(--ouro); }
+.stamp { position: absolute; inset: 0; display: none; place-items: center; pointer-events: none; z-index: 3; }
+.stamp span {
+  font-family: var(--font-display); font-size: 76px; color: var(--rosa); background: #fff;
+  border: 6px solid var(--rosa); padding: 0 18px; transform: rotate(-9deg); border-radius: 6px;
+  animation: slam .3s cubic-bezier(.2,1.8,.4,1);
+}
+[data-fase="fim"] .stamp { display: grid; }
+@keyframes pop { from { transform: scale(.5) rotate(-5deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pulse { 50% { opacity: .35; } }
+@keyframes tic { from { transform: translateY(-14px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes lock { from { transform: scale(1.3) rotate(-6deg); } to { transform: none; } }
+@keyframes slam { from { transform: rotate(-9deg) scale(2.2); opacity: 0; } to { transform: rotate(-9deg) scale(1); opacity: 1; } }
+@keyframes slide { from { opacity: 0; margin-top: -8px; } to { opacity: 1; margin-top: 0; } }
+@keyframes rise { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.start { display: none; font-family: var(--font-display); font-size: 20px; padding: 14px 18px; width: 100%;
+  background: var(--ouro); color: var(--roxo-escuro); box-shadow: 4px 4px 0 var(--roxo-escuro); }
+[data-fase="espera"] .start { display: block; }
+
+/* ----- avatares ----- */
+.av {
+  --s: 40px; position: relative; width: var(--s); height: var(--s); font-size: calc(var(--s) * .45);
+  border-radius: 50%; overflow: hidden; display: grid; place-items: center; flex: none;
+  font-family: var(--font-display); color: var(--roxo-escuro); border: 3px solid #fff;
+}
+.av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.av.vazio { background: rgba(255,255,255,.18) !important; border: 3px dashed rgba(255,255,255,.7); color: #fff; }
+
+/* ----- tabela de acertos ----- */
+.tabela { display: grid; grid-template-columns: minmax(0,1fr) 3px minmax(0,1fr); gap: 10px; }
+.divisor { background: #fff; border-radius: 3px; opacity: .85; }
+.col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.linha {
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 8px;
+  padding: 6px 10px 6px 6px; border-radius: 14px; min-height: 52px; text-align: left;
+  color: var(--roxo-escuro); background: #fff; box-shadow: 3px 3px 0 rgba(42,10,110,.55);
+}
+.linha.nova { animation: slide .3s ease-out; }
+.linha .t { min-width: 0; }
+.linha .n { font-size: 11px; font-weight: 500; opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linha .w { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linha .p { font-family: var(--font-display); font-size: 16px; white-space: nowrap; }
+.linha.t1 { background: var(--ouro); } .linha.t2 { background: var(--aqua); } .linha.t3 { background: var(--rosa); }
+.linha.ok .p { color: var(--laranja); } .linha.rep .p { color: #8a72d6; }
+.linha.vazia { background: rgba(255,255,255,.2); box-shadow: none; border: 2px dashed rgba(255,255,255,.65); color: #fff; justify-content: center; }
+.linha.vazia .t { text-align: center; grid-column: 1 / -1; opacity: .8; }
+
+/* ----- pódios (mini, intervalo, final) ----- */
+.pod { display: grid; grid-template-columns: 1fr 1.25fr 1fr; align-items: end; gap: 8px; width: 100%; }
+.pcol { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.pcol > .val { order: 0; } .pcol > .crown { order: 1; } .pcol > .av { order: 2; } .pcol > .nm { order: 3; } .pcol > .blk { order: 5; }
+.pcol .nm { font-weight: 700; font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcol .val { font-family: var(--font-display); font-size: 26px; text-shadow: 2px 2px 0 var(--rosa); min-height: 30px; }
+.pcol.p1 .av { border-color: var(--ouro); } .pcol.p2 .av { border-color: var(--aqua); } .pcol.p3 .av { border-color: var(--rosa); }
+.pcol .blk {
+  width: 100%; display: grid; place-items: center; font-family: var(--font-display); color: var(--roxo-escuro);
+  border-radius: 8px 8px 0 0;
+}
+.pcol.p1 .blk { background: var(--ouro); } .pcol.p2 .blk { background: var(--aqua); } .pcol.p3 .blk { background: var(--rosa); }
+.pcol.vazio { opacity: .55; }
+.crown { width: 38px; height: 26px; margin-bottom: -6px; }
+
+.pod.inter { margin-top: 6px; }
+.pod.inter .pcol > .val, .pod.mini .pcol > .val { order: 4; font-size: 15px; text-shadow: none; min-height: 0; color: var(--ouro); }
+.pod.inter .pcol .av { animation: rise .5s ease-out both; }
+.pod.inter .p1 .av { --s: 132px; border-width: 5px; } .pod.inter .p2 .av, .pod.inter .p3 .av { --s: 92px; border-width: 4px; }
+.pod.inter .pcol { padding-bottom: 6px; } .pod.inter .p1 { margin-bottom: 40px; }
+.pod.inter .nm { font-size: 15px; }
+.pod.inter .blk, .pod.mini .blk { }
+.pod.inter .blk { display: none; }
+
+.pod.podfinal .p1 .av { --s: 128px; border-width: 5px; } .pod.podfinal .p2 .av, .pod.podfinal .p3 .av { --s: 92px; border-width: 4px; }
+.pod.podfinal .pcol .av { animation: rise .6s ease-out both; }
+.pod.podfinal .p1 .blk { height: 92px; font-size: 34px; } .pod.podfinal .p2 .blk { height: 64px; font-size: 26px; } .pod.podfinal .p3 .blk { height: 44px; font-size: 22px; }
+.pod.podfinal .nm { font-size: 15px; }
+
+.painel { background: rgba(42,10,110,.92); border: 3px solid #fff; border-radius: 16px; padding: 12px 12px 0; overflow: hidden; }
+.pod.mini .p1 .av { --s: 50px; } .pod.mini .p2 .av, .pod.mini .p3 .av { --s: 38px; }
+.pod.mini .nm { font-size: 11px; }
+.pod.mini .p1 .blk { height: 38px; font-size: 18px; } .pod.mini .p2 .blk { height: 26px; font-size: 14px; } .pod.mini .p3 .blk { height: 18px; font-size: 12px; }
+.pod.mini .pcol { gap: 2px; }
+
+.campeoes {
+  font-family: var(--font-display); font-size: 38px; text-transform: uppercase; letter-spacing: .04em;
+  background: var(--ouro); color: var(--roxo-escuro); padding: 4px 22px 8px; border-radius: 12px;
+  box-shadow: 5px 5px 0 var(--roxo-escuro); margin-bottom: 14px;
+}
+.quartos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; margin-top: 18px; }
+.quarto { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.quarto .lb { font-family: var(--font-display); font-size: 14px; color: var(--roxo-escuro); letter-spacing: .06em; text-transform: uppercase; }
+.quarto .cd {
+  display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 8px; text-align: left;
+  background: #fff; color: var(--roxo-escuro); border-radius: 14px; padding: 8px; box-shadow: 4px 4px 0 var(--roxo-escuro);
+}
+.quarto .cd .av { --s: 44px; border-color: var(--roxo); }
+.quarto .nm { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quarto .pt { font-size: 12px; font-weight: 500; opacity: .75; }
+.quarto .cd.vazio { background: rgba(255,255,255,.4); box-shadow: none; }
+
+.bottom { display: flex; flex-direction: column; gap: 12px; }
+.dica { color: #fff; font-size: 14px; opacity: .9; }
+
+/* ----- painel de teste ----- */
+.lab { background: var(--roxo-escuro); border-radius: 12px; padding: 14px; text-align: left; color: #fff; }
+.lab summary { cursor: pointer; font-weight: 700; }
+.lab form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.lab input { flex: 1 1 120px; min-width: 0; font: inherit; color: var(--roxo-escuro); background: #fff; border: 0; border-radius: 8px; padding: 10px 12px; }
+button { font: inherit; font-weight: 700; cursor: pointer; border: 0; border-radius: 8px; padding: 10px 14px; background: var(--ouro); color: var(--roxo-escuro); }
+button.ghost { background: transparent; color: #fff; box-shadow: inset 0 0 0 2px var(--lilas); }
+button.on { background: var(--aqua); color: var(--roxo-escuro); box-shadow: none; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+:focus-visible { outline: 3px solid var(--ouro); outline-offset: 2px; }
+.wrap { position: relative; }
+
+@media (max-width: 380px) {
+  .tname { font-size: 34px; } .tlabel { font-size: 26px; }
+  .orb { width: 176px; height: 176px; } .disc { inset: 19px; font-size: 96px; }
+  .pod.inter .p1 .av, .pod.podfinal .p1 .av { --s: 108px; } .pod.inter .p2 .av, .pod.inter .p3 .av, .pod.podfinal .p2 .av, .pod.podfinal .p3 .av { --s: 76px; }
+  .campeoes { font-size: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .disc.tic, .disc.lock, .stamp span, .linha.nova, .toast, .tname, .pcol .av { animation: none !important; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app" data-fase="espera">
+  <div class="top">
+    <div class="clockchip" id="clockChip">30</div>
+    <div class="status" id="status"><i></i><span id="statusTxt">Conectando...</span></div>
+    <div class="roundtag" id="roundTag">RODADA <b id="rNum">0</b>/<span id="rTot">10</span></div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+
+  <section class="stage" id="stage">
+    <div class="tlabel" id="tlabel">STOP!</div>
+    <div class="tname" id="tname">Pronto?</div>
+    <div class="orb">
+      <svg class="ring" id="ring" viewBox="0 0 220 220" aria-hidden="true">
+        <circle class="trk" cx="110" cy="110" r="102"></circle>
+        <circle class="prog" id="prog" cx="110" cy="110" r="102" transform="rotate(-90 110 110)"></circle>
+      </svg>
+      <div class="disc" id="letter" aria-live="polite">?</div>
+    </div>
+    <div class="frase" id="frase">Aperte o botão abaixo para iniciar.</div>
+    <div class="stamp"><span>STOP!</span></div>
+  </section>
+
+  <section class="interval" id="interval">
+    <div class="tlabel small">Mais rápidos da rodada</div>
+    <div id="trioInter"></div>
+    <div class="dica">Próximo tema em instantes</div>
+  </section>
+
+  <section class="final" id="final">
+    <div class="campeoes">Campeões</div>
+    <div id="podioFinal"></div>
+    <div class="quartos" id="quartos"></div>
+  </section>
+
+  <button class="start" id="startBtn" type="button">Começar o jogo</button>
+
+  <div class="bottom" id="bottom">
+    <div class="tabela">
+      <div class="col" id="colEsq"></div>
+      <div class="divisor"></div>
+      <div class="col" id="colDir"></div>
+    </div>
+    <div class="painel"><div id="miniPod"></div></div>
+  </div>
+
+  <details class="lab" id="lab" open>
+    <summary>Painel de teste (some sozinho quando o servidor da live está ligado)</summary>
+    <form id="simForm" autocomplete="off">
+      <input id="simUser" type="text" placeholder="Nome do usuário" value="maria_tiktok" aria-label="Nome do usuário">
+      <input id="simText" type="text" placeholder="Resposta (ex.: Banana)" aria-label="Resposta do comentário">
+      <button type="submit">Enviar comentário</button>
+    </form>
+    <div class="row">
+      <button type="button" class="ghost" id="botsBtn">Comentários automáticos: desligado</button>
+      <button type="button" class="ghost" id="skipBtn">Pular tempo da rodada</button>
+      <button type="button" class="ghost" id="finalBtn">Ver tela final</button>
+      <button type="button" class="ghost" id="resetBtn">Zerar tudo</button>
+    </div>
+  </details>
+</div>
+
+<script>
+/* ============ CONFIGURAÇÕES: é aqui que você muda o jogo ============ */
+var TOTAL_RODADAS = 10;   // quantas rodadas tem o jogo
+var TEMPO_PREPARE = 3;    // segundos do aviso "Prepare-se para o próximo tema"
+var TEMPO_TEMA    = 3;    // segundos mostrando o tema sorteado
+var TEMPO_RODADA  = 30;   // segundos de cada rodada
+var TEMPO_STAMP   = 1.8;  // segundos do carimbo STOP! no fim da rodada
+var PAUSA_FIM     = 8;    // segundos do intervalo (3 mais rápidos) entre as rodadas
+var TEMPO_FINAL   = 7;    // segundos mostrando os campeões antes de recomeçar o jogo sozinho
+var PONTOS_1 = 20;        // 1º a acertar
+var PONTOS_2 = 15;        // 2º a acertar
+var PONTOS_3 = 10;        // 3º em diante
+var PONTOS_REPETIDA = 5;  // quem repete uma resposta que já apareceu
+var MIN_PALAVRAS  = 2;    // a letra só sai se o tema tiver pelo menos tantas palavras com ela
+
+/* Temas que entram no jogo. Para tirar um tema, apague o nome desta lista. */
+var TEMAS_ATIVOS = ["Cor", "Animal", "Parte do corpo", "Cidade", "Nome", "País", "Fruta", "Comida", "Profissão", "Objeto"];
+/* Artigo usado na frase "Digite uma cor com a letra B" */
+var ARTIGOS = { "Cor": "uma", "Animal": "um", "Parte do corpo": "uma", "Cidade": "uma", "Nome": "um",
+                "País": "um", "Fruta": "uma", "Comida": "uma", "Profissão": "uma", "Objeto": "um" };
+
+/* Listas de palavras aceitas (sem acento, separadas por vírgula).
+   Para acrescentar uma palavra, escreva ela no meio da lista do tema. */
+var LISTAS = {
+  "Cor": "amarelo,azul,ambar,anil,aqua,areia,alaranjado,azul marinho,azul celeste,azul royal,abobora,bege,branco,bordo,bronze,berinjela,borgonha,caramelo,carmim,castanho,cinza,cobre,coral,creme,cereja,chumbo,ciano,champanhe,dourado,damasco,esmeralda,escarlate,fucsia,ferrugem,grafite,grena,goiaba,gelo,indigo,jade,laranja,lilas,lavanda,limao,magenta,marrom,mostarda,marfim,menta,mel,mogno,musgo,negro,neve,nude,ocre,oliva,ouro,opala,pink,preto,prata,pessego,purpura,perola,petroleo,rosa,roxo,rubi,rosa choque,salmao,safira,sepia,terracota,turquesa,tangerina,tijolo,uva,urucum,vermelho,verde,violeta,vinho,verde limao,verde musgo",
+
+  "Animal": "abelha,aguia,aranha,arara,avestruz,anta,atum,andorinha,antilope,alpaca,anaconda,albatroz,baleia,besouro,bode,boi,borboleta,burro,bufalo,bem te vi,cachorro,cavalo,cabra,camelo,camaleao,canguru,capivara,caranguejo,cobra,coelho,coruja,crocodilo,cisne,cervo,cachalote,cegonha,chimpanze,coala,condor,dromedario,doninha,diabo da tasmania,elefante,escorpiao,esquilo,estrela do mar,egua,enguia,ema,escaravelho,foca,formiga,falcao,flamingo,furao,faisao,gato,galinha,ganso,gaviao,girafa,golfinho,gorila,gamba,grilo,gazela,galo,hipopotamo,hiena,hamster,harpia,hipocampo,iguana,ibis,impala,jacare,jaguar,javali,jabuti,jiboia,joaninha,jumento,leao,leopardo,lagarto,lobo,lontra,lula,lebre,libelula,lagosta,lhama,lesma,lemure,macaco,morcego,mosquito,mosca,minhoca,mula,marmota,medusa,morsa,mico,mariposa,naja,narval,onca,ovelha,orangotango,ostra,ornitorrinco,orca,ourico,pato,porco,peixe,papagaio,pinguim,pavao,panda,pantera,pombo,polvo,puma,perereca,pulga,piranha,pelicano,quati,quero quero,raposa,rato,rinoceronte,rena,rouxinol,raia,sapo,serpente,suricato,salmao,sardinha,sabia,tigre,tartaruga,tubarao,tucano,tamandua,tatu,texugo,tilapia,touro,traira,urso,urubu,urso polar,vaca,veado,vespa,viuva negra,vaga lume,zebra,zangao",
+
+  "Parte do corpo": "abdomen,antebraco,axila,aorta,amigdala,articulacao,arcada dentaria,barriga,bochecha,braco,boca,bacia,bexiga,biceps,bumbum,cabeca,cabelo,cotovelo,coxa,costela,coracao,cerebro,calcanhar,canela,cilios,cintura,clavicula,cranio,coluna,colo,dedo,dente,diafragma,duodeno,estomago,esofago,espinha dorsal,epiderme,esterno,figado,face,femur,fibula,fronte,garganta,gengiva,gluteo,glandula,hipofise,hipotalamo,intestino,iris,ilio,joelho,jugular,lingua,labio,lombar,laringe,lobulo,mao,mandibula,musculo,maxilar,mamilo,mento,nariz,nuca,nervo,narina,neuronio,nadega,olho,orelha,ombro,osso,ouvido,ovario,omoplata,perna,pe,pescoco,pulso,pulmao,pele,pupila,palpebra,panturrilha,polegar,peito,pancreas,patela,pelvis,punho,planta do pe,queixo,quadril,rim,rosto,retina,reto,rotula,sobrancelha,seio,sangue,sacro,tornozelo,testa,torax,tendao,tibia,tronco,tireoide,tonsila,traqueia,unha,umbigo,umero,uretra,utero,veia,vesicula,vertebra,virilha,ventre",
+
+  "Cidade": "aracaju,americana,anapolis,aparecida,araraquara,amsterdam,atenas,belem,belo horizonte,brasilia,blumenau,barueri,buenos aires,berlim,bogota,bauru,barcelona,curitiba,campinas,cuiaba,campo grande,caxias do sul,cascavel,canoas,caruaru,cairo,duque de caxias,dubai,divinopolis,dourados,embu das artes,estocolmo,fortaleza,florianopolis,franca,foz do iguacu,feira de santana,florenca,goiania,guarulhos,guarapuava,governador valadares,genebra,hamburgo,havana,helsinque,hong kong,itabuna,ilheus,imperatriz,itajai,ipatinga,istambul,joinville,joao pessoa,juiz de fora,jundiai,juazeiro,jacarta,londres,lisboa,londrina,lima,limeira,manaus,maceio,maringa,macapa,marilia,mossoro,madri,milao,moscou,montevideu,natal,niteroi,nova iguacu,nova york,osasco,olinda,osaka,oslo,ouro preto,porto alegre,porto velho,palmas,petropolis,piracicaba,paris,pelotas,praga,pequim,quito,quixada,quixeramobim,recife,rio de janeiro,ribeirao preto,rio branco,roma,rio verde,sao paulo,salvador,santos,sorocaba,serra,sao luis,santo andre,sydney,seul,santiago,teresina,taubate,toquio,toronto,uberlandia,uberaba,uruguaiana,vitoria,vila velha,vitoria da conquista,volta redonda,veneza,viena,vancouver,zurique",
+
+  "Nome": "ana,andre,alice,antonio,amanda,alex,aline,artur,adriana,alan,bruno,beatriz,bianca,bernardo,bruna,benjamin,bento,barbara,breno,carlos,carla,camila,caio,carolina,claudia,cristiano,clara,cecilia,daniel,daniela,diego,debora,davi,denise,diana,douglas,eduardo,eduarda,elisa,emanuel,emilia,erick,eva,enzo,estela,felipe,fernanda,fabio,flavia,francisco,fabiana,fernando,filipe,gabriel,gabriela,gustavo,giovana,guilherme,gisele,gael,gilberto,henrique,helena,hugo,helio,heitor,hortensia,igor,isabela,isabel,ivan,ines,iara,irene,isaac,joao,julia,jose,juliana,jorge,julio,joana,jessica,joaquim,karina,kaique,katia,kevin,karen,lucas,laura,leonardo,larissa,luana,luiz,livia,leticia,lara,maria,marcos,mariana,miguel,marcelo,marina,manuela,matheus,monica,nicolas,natalia,nathan,nina,nelson,nadia,noemi,otavio,olivia,osvaldo,omar,orlando,pedro,paulo,paula,patricia,priscila,pablo,paloma,quiteria,rafael,rafaela,ricardo,renata,rodrigo,roberto,rita,raul,rebeca,sara,samuel,sofia,sandra,sergio,sabrina,silvia,simone,thiago,tiago,tereza,tatiana,tania,tales,tomas,theo,ursula,ulisses,ubiratan,vitor,vitoria,valentina,vanessa,victor,viviane,vera,vinicius,wagner,wesley,wilson,william,yasmin,yuri,yara,zeca,zoe,ze",
+
+  "País": "argentina,alemanha,australia,angola,austria,arabia saudita,albania,argelia,armenia,afeganistao,andorra,brasil,belgica,bolivia,bulgaria,bangladesh,bahamas,butao,belize,bielorrussia,canada,chile,china,colombia,cuba,coreia do sul,costa rica,croacia,camaroes,catar,chipre,dinamarca,djibuti,dominica,espanha,egito,equador,estados unidos,escocia,eslovenia,estonia,etiopia,emirados arabes,franca,filipinas,finlandia,fiji,grecia,gana,guatemala,guiana,georgia,gambia,guine,holanda,honduras,hungria,haiti,italia,india,indonesia,ira,iraque,irlanda,islandia,israel,inglaterra,japao,jamaica,jordania,kuwait,kosovo,libano,libia,lituania,luxemburgo,letonia,laos,liberia,mexico,marrocos,mocambique,malasia,mongolia,madagascar,mali,myanmar,moldavia,monaco,noruega,nigeria,nepal,nova zelandia,nicaragua,namibia,niger,oma,portugal,peru,paraguai,polonia,panama,paquistao,palestina,quenia,quirguistao,russia,romenia,ruanda,suecia,suica,senegal,servia,singapura,siria,somalia,sudao,suriname,turquia,tailandia,tunisia,tanzania,taiwan,uruguai,ucrania,uganda,uzbequistao,venezuela,vietna,vaticano,zambia,zimbabue",
+
+  "Fruta": "abacaxi,abacate,acerola,amora,ameixa,acai,abiu,atemoia,banana,bergamota,caju,caqui,carambola,cereja,coco,cupuacu,cajamanga,ciriguela,damasco,framboesa,figo,fruta do conde,fruta pao,goiaba,graviola,groselha,guarana,genipapo,inga,jabuticaba,jaca,jambo,jatoba,kiwi,laranja,limao,lichia,lima,manga,mamao,maca,melancia,melao,maracuja,mexerica,morango,mirtilo,mangaba,nectarina,nespera,pera,pessego,pitanga,pitaya,pomelo,pinha,pequi,pupunha,roma,sapoti,seriguela,tangerina,tamarindo,tamara,toranja,tomate,uva,umbu,uvaia",
+
+  "Comida": "arroz,acaraje,abobora,alface,agriao,alho,amendoim,aipim,azeitona,acai,bolo,batata,brigadeiro,broa,bacalhau,bife,bolacha,biscoito,beterraba,brocolis,baiao de dois,churrasco,coxinha,carne,cuscuz,canjica,cenoura,cebola,chocolate,couve,creme,cachorro quente,camarao,doce de leite,donut,dobradinha,empada,esfiha,escondidinho,espaguete,espinafre,ervilha,feijoada,farofa,frango,feijao,farinha,fritas,fondue,file,guacamole,goiabada,gelatina,granola,hamburguer,hot dog,homus,iogurte,isca de peixe,jilo,kibe,ketchup,lasanha,linguica,lentilha,leite,lombo,lanche,macarrao,mandioca,milho,moqueca,mortadela,maionese,manteiga,mingau,mousse,nhoque,nutella,nuggets,omelete,ovo,pizza,pao,pastel,pamonha,pudim,pipoca,pacoca,peixe,picanha,pirao,pure,presunto,panqueca,queijo,quibe,quindim,quiche,risoto,rabanada,ravioli,rosca,rocambole,sorvete,sanduiche,sopa,salada,sushi,salsicha,sardinha,strogonoff,salame,tapioca,torta,tutu,tomate,tacos,tabule,torrada,vatapa,vinagrete,vagem,waffle,yakisoba",
+
+  "Profissão": "advogado,arquiteto,atleta,ator,atriz,agricultor,artista,analista,astronauta,auxiliar,acougueiro,assistente,bombeiro,bailarino,barbeiro,biologo,bancario,baba,barista,boticario,cozinheiro,cantor,carpinteiro,cientista,contador,costureira,caminhoneiro,cabeleireiro,carteiro,caixa,confeiteiro,chaveiro,dentista,delegado,designer,desenhista,dj,diretor,doutor,engenheiro,eletricista,enfermeiro,escritor,empresario,encanador,economista,estilista,estagiario,fotografo,farmaceutico,fisioterapeuta,fazendeiro,frentista,faxineiro,fisico,garcom,gari,gerente,guarda,geologo,goleiro,guia,historiador,hoteleiro,instrutor,interprete,jornalista,juiz,jardineiro,jogador,locutor,lixeiro,lutador,medico,motorista,mecanico,musico,marceneiro,maquiador,mestre,modelo,motoboy,nutricionista,nadador,notario,oftalmologista,operador,orientador,professor,padeiro,pedreiro,policial,pintor,piloto,psicologo,pescador,pedagogo,programador,promotor,pastor,padre,quimico,reporter,recepcionista,secretario,soldado,sapateiro,soldador,taxista,tecnico,tradutor,terapeuta,treinador,vendedor,veterinario,vigilante,vereador,youtuber,zelador,zootecnista",
+
+  "Objeto": "armario,abajur,agulha,alicate,almofada,anel,aspirador,bola,balde,bicicleta,bolsa,borracha,banco,bateria,bone,cadeira,caneta,computador,celular,cama,copo,colher,chave,caderno,cortina,carro,dado,disco,despertador,espelho,escova,estante,escada,envelope,faca,fogao,ferro,fone,garfo,garrafa,geladeira,guarda chuva,guitarra,helice,ima,impressora,interruptor,janela,jarra,joystick,lapis,lampada,lanterna,livro,lixeira,luva,lupa,mesa,mochila,martelo,microfone,mouse,moeda,notebook,navalha,oculos,oculos de sol,onibus,panela,prato,porta,pente,papel,prego,pincel,piano,quadro,quebra cabeca,relogio,radio,regua,rede,sofa,sapato,sabonete,secador,serra,telefone,televisao,tesoura,toalha,tapete,tenis,teclado,tijolo,ventilador,vassoura,vaso,violao,videogame"
+};
+/* ==================================================================== */
+
+/* ---------- Lógica pura (testável fora do navegador) ---------- */
+function normalizar(t) {
+  return String(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+var INDICE = {};      // tema -> { letra -> { palavra: true } }
+var LETRAS_DO_TEMA = {}; // tema -> [letras válidas]
+(function montarIndice() {
+  TEMAS_ATIVOS.forEach(function (tema) {
+    var porLetra = {};
+    String(LISTAS[tema] || "").split(",").forEach(function (p) {
+      var w = normalizar(p);
+      if (!w) return;
+      var l = w.charAt(0).toUpperCase();
+      (porLetra[l] = porLetra[l] || {})[w] = true;
+    });
+    INDICE[tema] = porLetra;
+    LETRAS_DO_TEMA[tema] = Object.keys(porLetra).filter(function (l) {
+      return Object.keys(porLetra[l]).length >= MIN_PALAVRAS;
+    });
+  });
+})();
+
+/* Devolve { ok, palavra, motivo } para uma resposta dentro de (tema, letra). */
+function conferir(tema, letra, texto) {
+  var n = normalizar(texto);
+  if (n.length < 2) return { ok: false, motivo: "muito curta" };
+  var todas = INDICE[tema] || {};
+  function achar(s) {
+    var l = s.charAt(0).toUpperCase();
+    return todas[l] && todas[l][s] ? s : null;
+  }
+  var cand = [n];
+  if (n.slice(-2) === "es") cand.push(n.slice(0, -2));
+  if (n.slice(-1) === "s") cand.push(n.slice(0, -1));
+  var sem = n.replace(/^(o|a|os|as|um|uma) /, "");
+  if (sem !== n) cand.push(sem);
+  var achada = null;
+  for (var i = 0; i < cand.length && !achada; i++) achada = achar(cand[i]);
+  if (!achada) {
+    if (n.charAt(0).toUpperCase() !== letra) return { ok: false, motivo: "não começa com " + letra };
+    return { ok: false, motivo: "não achei em " + tema };
+  }
+  if (achada.charAt(0).toUpperCase() !== letra) return { ok: false, motivo: "não começa com " + letra };
+  return { ok: true, palavra: achada };
+}
+/* ===FIM-DA-LOGICA-PURA=== */
+
+function calcularPontos(posicaoUnica, repetida) {
+  if (repetida) return PONTOS_REPETIDA;
+  return posicaoUnica === 1 ? PONTOS_1 : (posicaoUnica === 2 ? PONTOS_2 : PONTOS_3);
+}
+/* ===FIM-DAS-REGRAS=== */
+
+var fase = "espera"; // espera | prepare | tema | roleta | rodada | fim | intervalo | final
+var rodada = 0, temaAtual = "", temaAnterior = "", letraAtual = "";
+var restante = 0, relogio = null, agenda = [];
+var jaRespondeu = {}, palavrasUsadas = {}, unicos = 0;
+var entradas = [];   // acertos da rodada, na ordem em que chegaram
+var placar = {};     // usuario -> pontos somados
+var perfis = {};     // usuario -> { nome, foto }
+var botsTimer = null;
+var CIRC = 2 * Math.PI * 102;
+
+var el = function (id) { return document.getElementById(id); };
+function sortear(lista) { return lista[Math.floor(Math.random() * lista.length)]; }
+function depois(ms, fn) { var t = setTimeout(fn, ms); agenda.push(t); return t; }
+function limpar(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function novo(tag, cls, txt) {
+  var d = document.createElement(tag);
+  if (cls) d.className = cls;
+  if (txt !== undefined) d.textContent = txt;
+  return d;
+}
+function nomeDe(u) { var p = perfis[u]; return (p && p.nome) || u; }
+
+/* ---------- Recebe QUALQUER comentário (painel de teste ou servidor da live) ---------- */
+function receberComentario(usuario, texto, nome, foto) {
+  var p = perfis[usuario] || { nome: usuario, foto: "" };
+  if (nome) p.nome = nome;
+  if (foto) p.foto = foto;
+  perfis[usuario] = p;
+
+  if (fase !== "rodada" || jaRespondeu[usuario]) return;
+  var digitado = String(texto).trim().slice(0, 28);
+  var r = conferir(temaAtual, letraAtual, digitado);
+  if (!r.ok) return;
+
+  var repetida = !!palavrasUsadas[r.palavra];
+  palavrasUsadas[r.palavra] = true;
+  jaRespondeu[usuario] = true;
+  var posicao = 0;
+  if (!repetida) { unicos += 1; posicao = unicos; }
+  var pts = calcularPontos(posicao, repetida);
+  entradas.push({ usuario: usuario, texto: digitado, pts: pts, top: !repetida && unicos <= 3 });
+  placar[usuario] = (placar[usuario] || 0) + pts;
+  desenharTabela();
+  desenharMiniPodio();
+}
+
+/* ---------- Desenho ---------- */
+var CORES_AV = ["#ff3d9a", "#19e3d1", "#ffd60a", "#ff8a1f", "#b6ff3b", "#7cc4ff", "#ff6b6b"];
+function avatar(usuario) {
+  var d = novo("div", "av");
+  var h = 0, i;
+  for (i = 0; i < usuario.length; i++) h = (h * 31 + usuario.charCodeAt(i)) >>> 0;
+  d.style.background = CORES_AV[h % CORES_AV.length];
+  d.appendChild(novo("span", "", (Array.from(nomeDe(usuario))[0] || "?").toUpperCase()));
+  var foto = perfis[usuario] && perfis[usuario].foto;
+  if (foto) {
+    var im = document.createElement("img");
+    im.alt = ""; im.referrerPolicy = "no-referrer";
+    im.onerror = function () { im.remove(); };
+    im.src = foto;
+    d.appendChild(im);
+  }
+  return d;
+}
+
+function linhaEntrada(e, cls, ehNova) {
+  var li = novo("div", "linha " + cls + (ehNova ? " nova" : ""));
+  li.appendChild(avatar(e.usuario));
+  var t = novo("div", "t");
+  t.appendChild(novo("div", "n", nomeDe(e.usuario)));
+  t.appendChild(novo("div", "w", e.texto));
+  li.appendChild(t);
+  li.appendChild(novo("div", "p", "+" + e.pts));
+  return li;
+}
+function linhaVazia() {
+  var li = novo("div", "linha vazia");
+  li.appendChild(novo("div", "t", "aguardando..."));
+  return li;
+}
+function desenharTabela() {
+  var esq = el("colEsq"), dir = el("colDir"), i;
+  limpar(esq); limpar(dir);
+  var ultima = entradas[entradas.length - 1];
+  var topos = entradas.filter(function (e) { return e.top; });
+  var resto = entradas.filter(function (e) { return !e.top; }).reverse().slice(0, 3);
+  for (i = 0; i < 3; i++) {
+    esq.appendChild(topos[i] ? linhaEntrada(topos[i], "t" + (i + 1), topos[i] === ultima) : linhaVazia());
+    dir.appendChild(resto[i] ? linhaEntrada(resto[i], resto[i].pts === PONTOS_REPETIDA ? "rep" : "ok", resto[i] === ultima) : linhaVazia());
+  }
+}
+
+function ranking() {
+  return Object.keys(placar).map(function (u) { return { usuario: u, pts: placar[u] }; })
+    .sort(function (a, b) { return b.pts - a.pts || (a.usuario < b.usuario ? -1 : 1); });
+}
+
+var COROA = '<svg class="crown" viewBox="0 0 38 26" aria-hidden="true"><path d="M2 8l9 7 8-13 8 13 9-7-3 17H5z" fill="#ffd60a" stroke="#2a0a6e" stroke-width="2" stroke-linejoin="round"/></svg>';
+/* modo: "mini" | "inter" | "final". lista: [{usuario, valor}] já em ordem de 1º a 3º */
+function montarPodio(cont, lista, modo) {
+  limpar(cont);
+  cont.className = "pod " + modo;
+  [2, 1, 3].forEach(function (pos) {
+    var it = lista[pos - 1];
+    var col = novo("div", "pcol p" + pos + (it ? "" : " vazio"));
+    col.appendChild(novo("div", "val", it ? it.valor : ""));
+    if (it && modo === "podfinal" && pos === 1) {
+      var c = novo("div"); c.innerHTML = COROA;
+      col.appendChild(c.firstChild);
+    }
+    if (it) { col.appendChild(avatar(it.usuario)); }
+    else { col.appendChild(novo("div", "av vazio", "?")); }
+    col.appendChild(novo("div", "nm", it ? nomeDe(it.usuario) : "—"));
+    if (modo !== "inter") col.appendChild(novo("div", "blk", pos + "º"));
+    cont.appendChild(col);
+  });
+}
+function desenharMiniPodio() {
+  var lista = ranking().slice(0, 3).map(function (r) { return { usuario: r.usuario, valor: r.pts + " pts" }; });
+  montarPodio(el("miniPod"), lista, "mini");
+}
+
+function mostrarIntervalo() {
+  var lista = entradas.filter(function (e) { return e.top; }).slice(0, 3)
+    .map(function (e) { return { usuario: e.usuario, valor: "+" + e.pts + " pts" }; });
+  montarPodio(el("trioInter"), lista, "inter");
+  mudarFase("intervalo");
+}
+
+function mostrarFinal() {
+  var rk = ranking();
+  montarPodio(el("podioFinal"), rk.slice(0, 3).map(function (r) { return { usuario: r.usuario, valor: String(r.pts) }; }), "podfinal");
+  var q = el("quartos"); limpar(q);
+  [3, 4].forEach(function (i) {
+    var r = rk[i];
+    var box = novo("div", "quarto");
+    box.appendChild(novo("div", "lb", (i + 1) + "º lugar"));
+    var cd = novo("div", "cd" + (r ? "" : " vazio"));
+    if (r) {
+      cd.appendChild(avatar(r.usuario));
+      var t = novo("div", "t");
+      t.style.minWidth = "0";
+      t.appendChild(novo("div", "nm", nomeDe(r.usuario)));
+      t.appendChild(novo("div", "pt", r.pts + " pts"));
+      cd.appendChild(t);
+    } else {
+      cd.appendChild(novo("div", "av vazio", "?"));
+      cd.appendChild(novo("div", "nm", "—"));
+    }
+    box.appendChild(cd);
+    q.appendChild(box);
+  });
+  el("roundTag").textContent = "FIM DE JOGO";
+  mudarFase("final");
+  depois(TEMPO_FINAL * 1000, iniciarJogo);
+}
+
+/* ---------- Fases ---------- */
+function mudarFase(f) {
+  fase = f;
+  el("app").setAttribute("data-fase", f);
+}
+function palco(rotulo, nome) {
+  el("tlabel").textContent = rotulo;
+  el("tname").textContent = nome;
+}
+function setFrase(partes) {
+  var fr = el("frase"); limpar(fr);
+  partes.forEach(function (p) {
+    if (typeof p === "string") fr.appendChild(document.createTextNode(p));
+    else fr.appendChild(novo("b", "", p.b));
+  });
+}
+function etiquetaRodada(n) {
+  el("roundTag").innerHTML = 'RODADA <b id="rNum">' + n + '</b>/<span id="rTot">' + TOTAL_RODADAS + '</span>';
+}
+
+function iniciarJogo() {
+  agenda.forEach(clearTimeout); agenda = [];
+  clearInterval(relogio);
+  rodada = 0; placar = {}; entradas = []; temaAnterior = "";
+  desenharTabela(); desenharMiniPodio();
+  proximoTema();
+}
+
+function proximoTema() {
+  entradas = []; unicos = 0;
+  desenharTabela();
+  etiquetaRodada(rodada + 1);
+  el("letter").textContent = "?";
+  el("prog").style.strokeDashoffset = 0;
+  el("ring").classList.remove("low");
+  palco("Prepare-se para o próximo tema", "• • •");
+  setFrase([""]);
+  mudarFase("prepare");
+  depois(TEMPO_PREPARE * 1000, mostrarTema);
+}
+
+function mostrarTema() {
+  var opcoes = TEMAS_ATIVOS.filter(function (t) { return LETRAS_DO_TEMA[t].length && t !== temaAnterior; });
+  if (!opcoes.length) opcoes = TEMAS_ATIVOS.filter(function (t) { return LETRAS_DO_TEMA[t].length; });
+  temaAtual = sortear(opcoes);
+  temaAnterior = temaAtual;
+  letraAtual = sortear(LETRAS_DO_TEMA[temaAtual]);
+  palco("Tema", temaAtual);
+  mudarFase("tema");
+  depois(TEMPO_TEMA * 1000, girarRoleta);
+}
+
+function girarRoleta() {
+  mudarFase("roleta");
+  setFrase(["Sorteando a letra..."]);
+  var disco = el("letter");
+  var passos = 26, i = 0, anterior = "";
+  function passo() {
+    i += 1;
+    var l;
+    if (i >= passos) { l = letraAtual; }
+    else { do { l = String.fromCharCode(65 + Math.floor(Math.random() * 26)); } while (l === anterior || l === letraAtual); }
+    anterior = l;
+    disco.textContent = l;
+    disco.classList.remove("tic", "lock"); void disco.offsetWidth;
+    disco.classList.add(i >= passos ? "lock" : "tic");
+    if (i >= passos) { depois(1000, novaRodada); return; }
+    depois(55 + i * i * 0.33, passo);
+  }
+  passo();
+}
+
+function novaRodada() {
+  rodada += 1;
+  jaRespondeu = {}; palavrasUsadas = {}; unicos = 0; entradas = [];
+  desenharTabela();
+  setFrase(["Digite " + (ARTIGOS[temaAtual] || "um") + " ", { b: temaAtual }, " com a letra ", { b: letraAtual }]);
+  mudarFase("rodada");
+  restante = TEMPO_RODADA;
+  atualizarRelogio();
+  clearInterval(relogio);
+  var fim = Date.now() + TEMPO_RODADA * 1000;
+  relogio = setInterval(function () {
+    restante = Math.max(0, (fim - Date.now()) / 1000);
+    atualizarRelogio();
+    if (restante <= 0) terminarRodada();
+  }, 100);
+}
+
+function atualizarRelogio() {
+  el("clockChip").textContent = Math.ceil(restante);
+  el("prog").style.strokeDashoffset = CIRC * (1 - restante / TEMPO_RODADA);
+  var baixo = restante <= 5;
+  el("clockChip").classList.toggle("low", baixo);
+  el("ring").classList.toggle("low", baixo);
+}
+
+function terminarRodada() {
+  clearInterval(relogio);
+  restante = 0; atualizarRelogio();
+  setFrase(["Tempo esgotado!"]);
+  mudarFase("fim");
+  depois(TEMPO_STAMP * 1000, function () {
+    if (rodada >= TOTAL_RODADAS) { mostrarFinal(); return; }
+    mostrarIntervalo();
+    depois(PAUSA_FIM * 1000, proximoTema);
+  });
+}
+
+/* ---------- Avisos e conexão com o servidor da live ---------- */
+var toastTimer = null;
+function avisoEntrada(nome) {
+  var t = el("toast");
+  t.textContent = String(nome).slice(0, 26) + " entrou na live";
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.hidden = true; }, 2500);
+}
+function mostrarStatus(texto, ligado) {
+  el("statusTxt").textContent = texto;
+  el("status").classList.toggle("on", !!ligado);
+}
+function modoLive(ligado) {
+  var forcar = location.hash === "#teste";
+  el("lab").hidden = ligado && !forcar;
+  if (!ligado) mostrarStatus("Modo teste (sem servidor)", false);
+}
+function conectarServidor() {
+  if (!window.EventSource) { modoLive(false); return; }
+  var abriu = false, es;
+  try { es = new EventSource("eventos"); } catch (e) { modoLive(false); return; }
+  es.onopen = function () { abriu = true; modoLive(true); mostrarStatus("Servidor conectado", true); };
+  es.onmessage = function (e) {
+    var m;
+    try { m = JSON.parse(e.data); } catch (x) { return; }
+    if (m.tipo === "chat") receberComentario(m.usuario, m.texto, m.nome, m.foto);
+    else if (m.tipo === "entrou") {
+      var p = perfis[m.usuario] || { nome: m.usuario, foto: "" };
+      if (m.nome) p.nome = m.nome;
+      if (m.foto) p.foto = m.foto;
+      perfis[m.usuario] = p;
+      avisoEntrada(p.nome);
+    }
+    else if (m.tipo === "status") mostrarStatus(m.texto, /^Conectado/.test(m.texto));
+  };
+  es.onerror = function () { if (!abriu) { es.close(); modoLive(false); } };
+}
+
+/* ---------- Painel de teste ---------- */
+var NOMES_BOTS = ["ana_ls","joao.gamer","bia_77","luh_oficial","pedrinho","carol_tk","rafa.live","duda22","gu_mello","nicole_x","thaisfun","marcao"];
+function comentarioFalso() {
+  var usuario = sortear(NOMES_BOTS), texto;
+  var deste = INDICE[temaAtual] && INDICE[temaAtual][letraAtual];
+  if (deste && Math.random() < 0.75) { texto = sortear(Object.keys(deste)); }
+  else { texto = sortear(["maria", "casa", "oi", "banana", "teste"]); }
+  receberComentario(usuario, texto);
+}
+function ligarBots(ligar) {
+  clearInterval(botsTimer); botsTimer = null;
+  var b = el("botsBtn");
+  b.classList.toggle("on", ligar);
+  b.textContent = "Comentários automáticos: " + (ligar ? "ligado" : "desligado");
+  if (ligar) botsTimer = setInterval(function () { if (fase === "rodada") comentarioFalso(); }, 1200);
+}
+
+el("startBtn").addEventListener("click", iniciarJogo);
+el("simForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  receberComentario(el("simUser").value.trim() || "visitante", el("simText").value);
+  el("simText").value = "";
+  el("simText").focus();
+});
+el("botsBtn").addEventListener("click", function () { ligarBots(!botsTimer); });
+el("skipBtn").addEventListener("click", function () { if (fase === "rodada") terminarRodada(); });
+el("finalBtn").addEventListener("click", function () {
+  agenda.forEach(clearTimeout); agenda = [];
+  clearInterval(relogio);
+  mostrarFinal();
+});
+el("resetBtn").addEventListener("click", function () {
+  agenda.forEach(clearTimeout); agenda = [];
+  clearInterval(relogio);
+  placar = {}; entradas = []; rodada = 0;
+  desenharTabela(); desenharMiniPodio();
+  etiquetaRodada(0);
+  palco("STOP!", "Pronto?");
+  setFrase(["Aperte o botão abaixo para iniciar."]);
+  mudarFase("espera");
+});
+
+etiquetaRodada(0);
+desenharTabela();
+desenharMiniPodio();
+conectarServidor();
+</script>
+
+</body>
+</html>
